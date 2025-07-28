@@ -19,6 +19,8 @@ export enum TableMode {
   GuessData
 };
 
+type LevelHint = [string, number, number];
+
 export class GameState {
   private readonly data: GameData;
   private readonly targetMon: Pokemon;
@@ -91,11 +93,11 @@ export class GameState {
     return ret;
   }
 
-  private static getHintKeyLevel(item: [string, number, number]) {
+  private static getHintKeyLevel(item: LevelHint) {
     return item[1] > 0 ? item[1] : item[2];
   }
 
-  private getAllHints(): [Map<MatchType, Set<string>>, Array<[string, number, number]>] {
+  private getAllHints(): [Map<MatchType, Set<string>>, Array<LevelHint>] {
     const catMap = new Map<MatchType, Set<string>>();
     const lvlMap = new Map<string, [number, number]>();
     for (const pkmn of this.guesses) {
@@ -126,11 +128,11 @@ export class GameState {
         }
       });
     }
-    const sortedLvlMap: Array<[string, number, number]> = [];
+    const sortedLvlMap: Array<LevelHint> = [];
     lvlMap.forEach((value: [number, number], key: string) => {
       sortedLvlMap.push([key, value[0], value[1]]);
     });
-    sortedLvlMap.sort((a: [string, number, number], b: [string, number, number]) => {
+    sortedLvlMap.sort((a: LevelHint, b: LevelHint) => {
       return GameState.getHintKeyLevel(a) - GameState.getHintKeyLevel(b);
     });
     return [catMap, sortedLvlMap];
@@ -148,6 +150,35 @@ export class GameState {
     }[status];
   }
 
+  /// Get moves that are known for sure: this includes both moves where
+  /// the clues have isolated the exact level, and also ones where by looking
+  /// at the range and what levels the pokemon learns, we can deduce the exact
+  /// level
+  private getKnownMoves(levelKnowledge: Array<LevelHint>): Set<string> {
+    const knownMoves = new Set<string>();
+    for (let i = 0; i < levelKnowledge.length; ++i) {
+      const item = levelKnowledge[i];
+      if (item[1] === item[2]) {
+        knownMoves.add(item[0]);
+      } else {
+        let matchingItems: Array<LearnItem> = [];
+        for (const lvlItem of this.targetMon.levelup) {
+          const level = lvlItem[0];
+          if (level >= item[1] && level <= item[2]) {
+            matchingItems.push(lvlItem);
+          }
+        }
+        if (matchingItems.length === 1) {
+          // Exactly one matching item, so we can view it as known
+          item[1] = matchingItems[0][0];
+          item[2] = matchingItems[0][0];
+          knownMoves.add(item[0]);
+        }
+      }
+    }
+    return knownMoves;
+  }
+
   private displayKnownInfo(outdiv: HTMLElement) {
     outdiv.replaceChildren("");
     const label = document.createElement("label");
@@ -160,14 +191,7 @@ export class GameState {
     let [extraMoves, levelKnowledge] = this.getAllHints();
     let tgtIdx = 0;
     let knowIdx = 0;
-    const knownMoves = new Set<string>();
-    console.log(levelKnowledge);
-    for (let i = 0; i < levelKnowledge.length; ++i) {
-      const item = levelKnowledge[i];
-      if (item[1] === item[2]) {
-        knownMoves.add(item[0]);
-      }
-    }
+    const knownMoves = this.getKnownMoves(levelKnowledge);
     const tableDiv = document.createElement("div");
     const table = document.createElement("table");
     table.className = "mytable";
