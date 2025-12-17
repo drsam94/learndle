@@ -206,6 +206,10 @@ export class GameState {
         if (knownMoves.has(move)) {
           rowElem = makeRow([tgtLevel + "", convertMove(move)]);
           rowElem.style.backgroundColor = GameState.getTableColor(MatchType.Match);
+          if (this.targetMon.types.indexOf(this.data.moveData.getMoveType(move)) != -1) {
+            // This is STAB
+            rowElem.style.fontWeight = "700";
+          }
         } else if (tgtLevel < knowLevel) {
           rowElem = makeRow([tgtLevel + "", "?"]);
         }
@@ -261,6 +265,10 @@ export class GameState {
       const row = [entry[0] + "", convertMove(entry[1])];
       const rowElem = makeRow(row);
       rowElem.style.backgroundColor = GameState.getTableColor(status);
+      if (pkmn.types.indexOf(this.data.moveData.getMoveType(entry[1])) != -1) {
+        // This is STAB
+        rowElem.style.fontWeight = "700";
+      }
       table.appendChild(rowElem);
     }
     return table;

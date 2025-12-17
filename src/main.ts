@@ -3,7 +3,7 @@
 import { autocomplete } from './autocomplete.js';
 import { getVersionKey, Version } from './version.js';
 import { PseudoKeyboardEvent, styleSetup } from './html_util.js'
-import { AllPokemonData, GameData, getPokemonNames } from './pkmn_data.js'
+import { AllPokemonData, GameData, getPokemonNames, MoveData, MoveJson } from './pkmn_data.js'
 import { GameState } from './game_state.js'
 
 function makeGuessBar(all_pokemon: Array<string>, callback: (_: string) => any): [HTMLDivElement, HTMLInputElement] {
@@ -35,14 +35,30 @@ function makeGuessBar(all_pokemon: Array<string>, callback: (_: string) => any):
 
 function main(): void {
   styleSetup();
-  const xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function () {
+  const xhttp1 = new XMLHttpRequest();
+  const xhttp2 = new XMLHttpRequest();
+  let j1: any = null;
+  let j2: any = null;
+  xhttp1.onreadystatechange = function () {
     if (this.readyState == 4 && this.status == 200) {
-      mainOnLoad(JSON.parse(xhttp.responseText));
+      j1 = JSON.parse(xhttp1.responseText);
+      if (j2 != null) {
+        mainOnLoad(j1, j2);
+      }
     }
   }
-  xhttp.open("GET", "res/all_pokemon.json", true);
-  xhttp.send();
+  xhttp2.onreadystatechange = function () {
+    if (this.readyState == 4 && this.status == 200) {
+      j2 = JSON.parse(xhttp2.responseText);
+      if (j1 != null) {
+        mainOnLoad(j1, j2);
+      }
+    }
+  }
+  xhttp1.open("GET", "res/all_pokemon.json", true);
+  xhttp2.open("GET", "res/all_moves.json", true);
+  xhttp1.send();
+  xhttp2.send();
 }
 
 function makeGuess(outdiv: HTMLDivElement, headerdiv: HTMLDivElement, guess: string, state: GameState): void {
@@ -61,10 +77,12 @@ class CurrentGame {
   private outdiv: HTMLDivElement;
   private headerDiv: HTMLDivElement;
   private allData: AllPokemonData;
-  constructor(allData: AllPokemonData, outdiv: HTMLDivElement, headerDiv: HTMLDivElement) {
+  private moveData: MoveData;
+  constructor(allData: AllPokemonData, moved: Record<string, MoveJson>, outdiv: HTMLDivElement, headerDiv: HTMLDivElement) {
     this.allData = allData;
     this.outdiv = outdiv;
     this.headerDiv = headerDiv;
+    this.moveData = new MoveData(moved)
   }
 
   public guessCallback(): (g: string) => void {
@@ -72,18 +90,18 @@ class CurrentGame {
   }
 
   public startGame(ver: Version): void {
-    const data = new GameData(ver, this.allData);
+    const data = new GameData(ver, this.allData, this.moveData);
     const target = data.getRandom();
     this.state = new GameState(data, target);
     this.state.renderGuesses(this.outdiv, this.headerDiv);
   }
 };
 
-function mainOnLoad(all_pokemon: AllPokemonData): void {
+function mainOnLoad(all_pokemon: AllPokemonData, all_moves: Record<string, MoveJson>): void {
   const headerDiv = document.createElement("div");
   const staticDiv = document.createElement("div");
   const outdiv = document.createElement("div");
-  const currentGame = new CurrentGame(all_pokemon, outdiv, headerDiv);
+  const currentGame = new CurrentGame(all_pokemon, all_moves, outdiv, headerDiv);
   const [guessBar, guessElem] = makeGuessBar(getPokemonNames(all_pokemon), currentGame.guessCallback());
 
   currentGame.startGame(Version.RB);
